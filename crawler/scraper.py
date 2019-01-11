@@ -29,6 +29,9 @@ class Scraper:
         headers = dict(DEFAULT_HEADERS)
         return headers
 
+    def get_url(self):
+        return self._url
+
     def get_data(self):
         return self._data
 
