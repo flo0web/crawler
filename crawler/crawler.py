@@ -99,8 +99,8 @@ class Crawler:
 
 
 class StealthCrawler(Crawler):
-    def __init__(self, proxy_manager: ProxyManager, seeds: List[Scraper], workers_limit=4):
-        super().__init__(seeds, workers_limit)
+    def __init__(self, proxy_manager: ProxyManager, seeds: List[Scraper], workers_limit=4, on_complete=None):
+        super().__init__(seeds, workers_limit, on_complete)
 
         self._proxy_manager = proxy_manager
 
