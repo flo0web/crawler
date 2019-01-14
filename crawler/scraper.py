@@ -12,13 +12,13 @@ class Scraper:
     def __init__(self, url):
         self._url = url
 
-        self._crawler = None
+        self._frontier = None
         self._data = []
 
-    def append_to(self, crawler):
-        self._crawler = crawler
+    def append_to(self, frontier):
+        self._frontier = frontier
 
-        self._crawler.schedule_request(
+        self._frontier.schedule_request(
             Request(self._url, self._parse, headers=self._get_headers())
         )
 

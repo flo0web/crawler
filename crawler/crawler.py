@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from asyncio import Queue
+from collections import deque
 from typing import List
 
 from .downloader import Request, Downloader, DownloadError, ConnError
@@ -10,29 +11,50 @@ from .scraper import Scraper
 DEFAULT_WORKERS_LIMIT = 4
 
 
+class Frontier:
+    """
+    The frontier collects requests from the one or more scrapers and gives out to the crawler on demand.
+    """
+
+    def __init__(self):
+        self._requests_queue = deque()
+        self._known_requests = set()
+
+    def schedule_request(self, req: Request):
+        """Registers a new request in case it has not been registered before."""
+        if req not in self._known_requests:
+            logging.getLogger('crawler').info('Request scheduled: %s' % req.url)
+
+            self._known_requests.add(req)
+            self._requests_queue.appendleft(req)
+
+    def next_request(self):
+        """Returns the next request from the request queue"""
+        return self._requests_queue.pop()
+
+
 class Crawler:
     """
     Crawler регистрирует список скраперов, которые он будет обслуживать,
-    управляет очередью запросов на извлечение от скраперов,
     извлекает код страниц из запросов с помощью загрузчика
     и отправляет скраперу для распознавание
     """
 
-    def __init__(self, seeds: List[Scraper], workers_limit=None):
-        self._seeds = seeds
+    def __init__(self, seeds: List[Scraper], workers_limit=None, on_complete=None):
         self._workers_limit = workers_limit or DEFAULT_WORKERS_LIMIT
+        self._on_complete = on_complete
 
         self._queue = Queue()
-        self._known_requests = set()
-
+        self._downloader = Downloader()
         self._loop = asyncio.get_event_loop()
 
-        self.__downloader = None
+        self._init(seeds)
+
+    def _init(self, seeds):
+        for s in seeds:
+            self._queue.put_nowait(s)
 
     async def run(self):
-        for seed in self._seeds:
-            seed.append_to(self)
-
         workers = [asyncio.Task(self._work(), loop=self._loop) for _ in range(self._workers_limit)]
 
         await self._queue.join()
@@ -42,21 +64,26 @@ class Crawler:
 
     async def _work(self):
         while True:
-            req = await self._queue.get()
+            spider = await self._queue.get()
 
-            try:
-                await self._process_request(req)
-            except Exception:
-                logging.getLogger('crawler').exception('Unhandled error: %s' % req.url)
+            frontier = Frontier()
+            spider.append_to(frontier)
+
+            while True:
+                try:
+                    req = frontier.next_request()
+                except IndexError:
+                    break
+
+                try:
+                    await self._process_request(req)
+                except Exception:
+                    logging.getLogger('crawler').exception('Unhandled error: %s' % req.url)
+
+            if self._on_complete is not None:
+                self._on_complete(spider)
 
             self._queue.task_done()
-
-    def schedule_request(self, req: Request):
-        if req not in self._known_requests:
-            logging.getLogger('crawler').info('Request scheduled: %s' % req.url)
-
-            self._known_requests.add(req)
-            self._queue.put_nowait(req)
 
     async def _process_request(self, req: Request):
         logging.getLogger('crawler').info('Request started: %s' % req.url)
@@ -69,13 +96,6 @@ class Crawler:
             await req.callback(resp)
 
         logging.getLogger('crawler').info('Request finished: %s' % req.url)
-
-    @property
-    def _downloader(self):
-        if self.__downloader is None:
-            self.__downloader = Downloader()
-
-        return self.__downloader
 
 
 class StealthCrawler(Crawler):
