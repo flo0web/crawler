@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -75,6 +76,9 @@ class Response:
     def get_url(self):
         return str(self._r.url)
 
+    def get_headers(self):
+        return self._r.headers
+
 
 class Downloader:
     def __init__(self, timeout=10):
@@ -84,7 +88,7 @@ class Downloader:
         async with aiohttp.ClientSession() as session:
             try:
                 r = await session.get(url, timeout=self._timeout, headers=headers, proxy=proxy)
-            except aiohttp.ClientError:
+            except (aiohttp.ClientError, asyncio.TimeoutError):
                 logging.getLogger('crawler').exception('Error downloading: %s' % url)
                 raise ConnError()
 
