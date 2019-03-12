@@ -83,22 +83,29 @@ class Response:
 class Downloader:
     def __init__(self, timeout=10):
         self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._session = aiohttp.ClientSession()
 
     async def download(self, url, headers=None, proxy=None) -> (Response, DownloadError):
-        async with aiohttp.ClientSession() as session:
-            try:
-                r = await session.get(url, timeout=self._timeout, headers=headers, proxy=proxy)
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                logging.getLogger('crawler').exception('Error downloading: %s' % url)
-                raise ConnError()
+        try:
+            r = await self._session.get(url, timeout=self._timeout, headers=headers, proxy=proxy)
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            logging.getLogger('crawler').exception('Error downloading: %s' % url)
+            raise ConnError()
 
-            try:
-                if r is not None:
-                    r.raise_for_status()
-            except aiohttp.ClientResponseError:
-                logging.getLogger('crawler').exception('Error downloading: %s' % url)
-                raise HttpError()
-
+        try:
+            r.raise_for_status()
+        except aiohttp.ClientResponseError:
+            logging.getLogger('crawler').exception('Error downloading: %s' % url)
+            raise HttpError()
+        else:
             await r.text()
+        finally:
+            r.release()
 
-            return Response(r)
+        return Response(r)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args, **kwargs):
+        await self._session.close()

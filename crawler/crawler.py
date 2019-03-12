@@ -45,7 +45,6 @@ class Crawler:
         self._on_complete = on_complete
 
         self._queue = Queue()
-        self._downloader = Downloader()
         self._loop = asyncio.get_event_loop()
 
         self._init(seeds)
@@ -69,27 +68,28 @@ class Crawler:
             frontier = Frontier()
             spider.append_to(frontier)
 
-            while True:
-                try:
-                    req = frontier.next_request()
-                except IndexError:
-                    break
+            async with Downloader() as downloader:
+                while True:
+                    try:
+                        req = frontier.next_request()
+                    except IndexError:
+                        break
 
-                try:
-                    await self._process_request(req)
-                except Exception:
-                    logging.getLogger('crawler').exception('Unhandled error: %s' % req.url)
+                    try:
+                        await self._process_request(req, downloader)
+                    except Exception:
+                        logging.getLogger('crawler').exception('Unhandled error: %s' % req.url)
 
             if self._on_complete is not None:
                 self._on_complete(spider)
 
             self._queue.task_done()
 
-    async def _process_request(self, req: Request):
+    async def _process_request(self, req: Request, downloader: Downloader):
         logging.getLogger('crawler').info('Request started: %s' % req.url)
 
         try:
-            resp = await self._downloader.download(req.url, headers=req.headers)
+            resp = await downloader.download(req.url, headers=req.headers)
         except DownloadError:
             pass
         else:
@@ -104,11 +104,11 @@ class StealthCrawler(Crawler):
 
         self._proxy_manager = proxy_manager
 
-    async def _process_request(self, req: Request):
+    async def _process_request(self, req: Request, downloader: Downloader):
         proxy = await self._proxy_manager.get()
 
         try:
-            resp = await self._downloader.download(req.url, headers=req.headers, proxy=proxy.address)
+            resp = await downloader.download(req.url, headers=req.headers, proxy=proxy.address)
         except ConnError:
             # Обработка ошибок сети (таймауты, соединения и т.п.)
             self._proxy_manager.release_unavailable(proxy)
