@@ -5,6 +5,9 @@ import logging
 import aiohttp
 from lxml import html
 
+METH_GET = 'GET'
+METH_POST = 'POST'
+
 
 class DownloadError(Exception):
     pass
@@ -19,19 +22,31 @@ class HttpError(DownloadError):
 
 
 class Request:
-    def __init__(self, url, callback, headers=None):
-        self.url = url
+    def __init__(self, url, callback, method=METH_GET, data=None, headers=None):
+        self._url = url
+        self._headers = headers
+        self._method = method
+
+        self._data = tuple((k, v) for k, v in data.items()) if data is not None else ()
+
         self.callback = callback
-        self.headers = headers
 
     def __hash__(self):
-        return hash(self.url)
+        return hash((self._url,) + self._data)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        return self.url == other.url
+        return self._url == other._url and self._data == other._data
+
+    def download_params(self):
+        return {
+            'method': self._method,
+            'url': self._url,
+            'data': self._data,
+            'headers': self._headers
+        }
 
 
 class Response:
@@ -85,9 +100,10 @@ class Downloader:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._session = aiohttp.ClientSession()
 
-    async def download(self, url, headers=None, proxy=None) -> (Response, DownloadError):
+    async def download(self, url, method=METH_GET, data=None, headers=None, proxy=None) -> (Response, DownloadError):
         try:
-            r = await self._session.get(url, timeout=self._timeout, headers=headers, proxy=proxy)
+            r = await self._session.request(method=method, url=url, data=data, timeout=self._timeout,
+                                            headers=headers, proxy=proxy)
         except (aiohttp.ClientError, asyncio.TimeoutError):
             logging.getLogger('crawler').exception('Error downloading: %s' % url)
             raise ConnError()

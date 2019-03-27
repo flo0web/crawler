@@ -23,7 +23,7 @@ class Frontier:
     def schedule_request(self, req: Request):
         """Registers a new request in case it has not been registered before."""
         if req not in self._known_requests:
-            logging.getLogger('crawler').info('Request scheduled: %s' % req.url)
+            logging.getLogger('crawler').info('Request scheduled: %s' % req.download_params())
 
             self._known_requests.add(req)
             self._requests_queue.appendleft(req)
@@ -86,16 +86,16 @@ class Crawler:
             self._queue.task_done()
 
     async def _process_request(self, req: Request, downloader: Downloader):
-        logging.getLogger('crawler').info('Request started: %s' % req.url)
+        logging.getLogger('crawler').info('Request started: %s' % req.download_params())
 
         try:
-            resp = await downloader.download(req.url, headers=req.headers)
+            resp = await downloader.download(**req.download_params())
         except DownloadError:
             pass
         else:
             await req.callback(resp)
 
-        logging.getLogger('crawler').info('Request finished: %s' % req.url)
+        logging.getLogger('crawler').info('Request finished: %s' % req.download_params())
 
 
 class StealthCrawler(Crawler):
@@ -108,7 +108,7 @@ class StealthCrawler(Crawler):
         proxy = await self._proxy_manager.get()
 
         try:
-            resp = await downloader.download(req.url, headers=req.headers, proxy=proxy.address)
+            resp = await downloader.download(**req.download_params())
         except ConnError:
             # Обработка ошибок сети (таймауты, соединения и т.п.)
             self._proxy_manager.release_unavailable(proxy)
