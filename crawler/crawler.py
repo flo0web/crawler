@@ -108,7 +108,7 @@ class StealthCrawler(Crawler):
         proxy = await self._proxy_manager.get()
 
         try:
-            resp = await downloader.download(**req.download_params(), proxy=proxy)
+            resp = await downloader.download(**req.download_params(), proxy=proxy.address)
         except ConnError:
             # Обработка ошибок сети (таймауты, соединения и т.п.)
             self._proxy_manager.release_unavailable(proxy)
