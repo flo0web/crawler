@@ -78,7 +78,7 @@ class Crawler:
                     try:
                         await self._process_request(req, downloader)
                     except Exception:
-                        logging.getLogger('crawler').exception('Unhandled error: %s' % req.url)
+                        logging.getLogger('crawler').exception('Unhandled error: %s' % req.download_params())
 
             if self._on_complete is not None:
                 self._on_complete(spider)
