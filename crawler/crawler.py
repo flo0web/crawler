@@ -105,7 +105,11 @@ class StealthCrawler(Crawler):
         self._proxy_manager = proxy_manager
 
     async def _process_request(self, req: Request, downloader: Downloader):
+        logging.getLogger('crawler').info('Request started: %s' % req.download_params())
+
         proxy = await self._proxy_manager.get()
+
+        logging.getLogger('crawler').info('Using proxy: %s' % proxy.address)
 
         try:
             resp = await downloader.download(**req.download_params(), proxy=proxy.address)
@@ -119,3 +123,5 @@ class StealthCrawler(Crawler):
             self._proxy_manager.release_valid(proxy)
 
             await req.callback(resp)
+
+        logging.getLogger('crawler').info('Request finished: %s' % req.download_params())
