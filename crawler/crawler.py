@@ -23,7 +23,7 @@ class Frontier:
     def schedule_request(self, req: Request):
         """Registers a new request in case it has not been registered before."""
         if req not in self._known_requests:
-            logging.getLogger('crawler').info('Request scheduled: %s' % req.download_params())
+            logging.getLogger('crawler').info('Request scheduled: %s', req.download_params())
 
             self._known_requests.add(req)
             self._requests_queue.appendleft(req)
@@ -78,7 +78,7 @@ class Crawler:
                     try:
                         await self._process_request(req, downloader)
                     except Exception:
-                        logging.getLogger('crawler').exception('Unhandled error: %s' % req.download_params())
+                        logging.getLogger('crawler').exception('Unhandled error: %s', req.download_params())
 
             if self._on_complete is not None:
                 self._on_complete(spider)
@@ -86,16 +86,16 @@ class Crawler:
             self._queue.task_done()
 
     async def _process_request(self, req: Request, downloader: Downloader):
-        logging.getLogger('crawler').info('Request started: %s' % req.download_params())
+        logging.getLogger('crawler').info('Request started: %s', req.download_params())
 
         try:
             resp = await downloader.download(**req.download_params())
         except DownloadError:
-            pass
+            logging.getLogger('crawler').exception('Download error: %s', req.get_url())
         else:
             await req.callback(resp)
 
-        logging.getLogger('crawler').info('Request finished: %s' % req.download_params())
+        logging.getLogger('crawler').info('Request finished: %s', req.download_params())
 
 
 class StealthCrawler(Crawler):
@@ -105,23 +105,25 @@ class StealthCrawler(Crawler):
         self._proxy_manager = proxy_manager
 
     async def _process_request(self, req: Request, downloader: Downloader):
-        logging.getLogger('crawler').info('Request started: %s' % req.download_params())
+        logging.getLogger('crawler').info('Request started: %s', req.download_params())
 
         proxy = await self._proxy_manager.get()
 
-        logging.getLogger('crawler').info('Using proxy: %s' % proxy.address)
+        logging.getLogger('crawler').info('Using proxy: %s', proxy.address)
 
         try:
             resp = await downloader.download(**req.download_params(), proxy=proxy.address)
         except ConnError:
             # Обработка ошибок сети (таймауты, соединения и т.п.)
+            logging.getLogger('crawler').exception('Connection error: %s', req.get_url())
             self._proxy_manager.release_unavailable(proxy)
         except DownloadError:
             # Обработка ошибок, не связаных с сетью (http и т.п.)
+            logging.getLogger('crawler').exception('HTTP error: %s', req.get_url())
             self._proxy_manager.release_valid(proxy)
         else:
             self._proxy_manager.release_valid(proxy)
 
             await req.callback(resp)
 
-        logging.getLogger('crawler').info('Request finished: %s' % req.download_params())
+        logging.getLogger('crawler').info('Request finished: %s', req.download_params())

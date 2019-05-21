@@ -48,6 +48,9 @@ class Request:
             'headers': self._headers
         }
 
+    def get_url(self):
+        return str(self._url)
+
 
 class Response:
     """
@@ -102,16 +105,20 @@ class Downloader:
 
     async def download(self, url, method=METH_GET, data=None, headers=None, proxy=None) -> (Response, DownloadError):
         try:
-            r = await self._session.request(method=method, url=url, data=data, timeout=self._timeout,
-                                            headers=headers, proxy=proxy)
+            r = await self._session.request(
+                method=method,
+                url=url,
+                data=data,
+                timeout=self._timeout,
+                headers=headers,
+                proxy=proxy
+            )
         except (aiohttp.ClientError, asyncio.TimeoutError):
-            logging.getLogger('crawler').exception('Error downloading: %s' % url)
             raise ConnError()
 
         try:
             r.raise_for_status()
         except aiohttp.ClientResponseError:
-            logging.getLogger('crawler').exception('Error downloading: %s' % url)
             raise HttpError()
         else:
             await r.text()
