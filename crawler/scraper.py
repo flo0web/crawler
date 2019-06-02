@@ -22,6 +22,9 @@ class Scraper:
             Request(self._url, self._parse, headers=self._get_headers())
         )
 
+    def get_frontier(self):
+        return self._frontier
+
     async def _parse(self, resp: Response):
         raise NotImplemented
 
