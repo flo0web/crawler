@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="crawler",
-    version="0.5.7",
+    version="0.5.8",
     author="Alexandr Arnautov",
     author_email="flo0.webmaster@gmail.com",
     description="A set of tools to develop web scrapers",

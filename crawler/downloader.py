@@ -66,7 +66,7 @@ class Response:
 
     @property
     async def source(self):
-        return await self._r.text()
+        return await self._r.text(encoding='utf-8')
 
     @property
     async def html_document(self):
