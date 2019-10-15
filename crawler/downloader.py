@@ -121,7 +121,7 @@ class Downloader:
         except aiohttp.ClientResponseError:
             raise HttpError()
         else:
-            await r.text()
+            await r.text(encoding='utf-8')
         finally:
             r.release()
 
