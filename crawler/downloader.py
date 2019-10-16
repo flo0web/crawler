@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 
 import aiohttp
 from lxml import html
@@ -22,10 +21,11 @@ class HttpError(DownloadError):
 
 
 class Request:
-    def __init__(self, url, callback, method=METH_GET, data=None, headers=None):
+    def __init__(self, url, callback, method=METH_GET, data=None, headers=None, encoding=None):
         self._url = url
         self._headers = headers
         self._method = method
+        self._encoding = encoding
 
         self._data = tuple((k, v) for k, v in data.items()) if data is not None else ()
 
@@ -45,7 +45,8 @@ class Request:
             'method': self._method,
             'url': self._url,
             'data': self._data,
-            'headers': self._headers
+            'headers': self._headers,
+            'encoding': self._encoding
         }
 
     def get_url(self):
@@ -58,15 +59,17 @@ class Response:
     third party libraries
     """
 
-    def __init__(self, r):
+    def __init__(self, r, text):
         self._r = r
+
+        self._text = text
 
         self._html_document = None
         self._json_document = None
 
     @property
     async def source(self):
-        return await self._r.text(encoding='utf-8')
+        return self._text
 
     @property
     async def html_document(self):
@@ -103,7 +106,8 @@ class Downloader:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._session = aiohttp.ClientSession()
 
-    async def download(self, url, method=METH_GET, data=None, headers=None, proxy=None) -> (Response, DownloadError):
+    async def download(self, url, method=METH_GET, data=None, headers=None, encoding=None, proxy=None) -> (
+            Response, DownloadError):
         try:
             r = await self._session.request(
                 method=method,
@@ -121,11 +125,11 @@ class Downloader:
         except aiohttp.ClientResponseError:
             raise HttpError()
         else:
-            await r.text(encoding='utf-8')
+            text = await r.text(encoding=encoding)
         finally:
             r.release()
 
-        return Response(r)
+        return Response(r, text)
 
     async def __aenter__(self):
         return self
