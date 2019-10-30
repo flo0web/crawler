@@ -3,6 +3,7 @@ import json
 
 import aiohttp
 from lxml import html
+from multidict import MultiDict
 
 METH_GET = 'GET'
 METH_POST = 'POST'
@@ -20,19 +21,33 @@ class HttpError(DownloadError):
     pass
 
 
+def dict_to_tuple(target):
+    if not target or target is None:
+        return ()
+
+    if isinstance(target, (dict, MultiDict)):
+        return tuple((k, dict_to_tuple(v) if isinstance(v, (dict, MultiDict, list)) else v) for k, v in target.items())
+    elif isinstance(target, list):
+        return tuple((dict_to_tuple(v) if isinstance(v, (dict, MultiDict, list)) else v) for v in target)
+    elif isinstance(target, (str, bytes)):
+        return target
+
+
 class Request:
-    def __init__(self, url, callback, method=METH_GET, data=None, headers=None, encoding=None):
+    def __init__(self, url, callback, method=METH_GET, data=None, json=False, headers=None, encoding=None):
         self._url = url
         self._headers = headers
         self._method = method
         self._encoding = encoding
 
-        self._data = tuple((k, v) for k, v in data.items()) if data is not None else ()
+        self._data = data
+        self._frozen_data = dict_to_tuple(data)
+        self._json = json
 
         self.callback = callback
 
     def __hash__(self):
-        return hash((self._url,) + self._data)
+        return hash((self._url,) + self._frozen_data)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -45,6 +60,7 @@ class Request:
             'method': self._method,
             'url': self._url,
             'data': self._data,
+            'json': self._json,
             'headers': self._headers,
             'encoding': self._encoding
         }
@@ -106,13 +122,14 @@ class Downloader:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._session = aiohttp.ClientSession()
 
-    async def download(self, url, method=METH_GET, data=None, headers=None, encoding=None, proxy=None) -> (
+    async def download(self, url, method=METH_GET, data=None, json=False, headers=None, encoding=None, proxy=None) -> (
             Response, DownloadError):
         try:
             r = await self._session.request(
                 method=method,
                 url=url,
-                data=data,
+                data=data if not json else None,
+                json=data if json else None,
                 timeout=self._timeout,
                 headers=headers,
                 proxy=proxy
