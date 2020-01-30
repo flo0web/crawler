@@ -6,7 +6,7 @@ from typing import List
 
 from .downloader import Request, Downloader, DownloadError, ConnError
 from .proxy import ProxyManager
-from .scraper import Scraper
+from .scraper import Scraper, ScraperError
 
 DEFAULT_WORKERS_LIMIT = 4
 
@@ -77,8 +77,10 @@ class Crawler:
 
                     try:
                         await self._process_request(req, downloader)
+                    except ScraperError:
+                        logging.getLogger('crawler').exception('Scraping error: %s', req.download_params())
                     except Exception:
-                        logging.getLogger('crawler').exception('Unhandled error: %s', req.download_params())
+                        logging.getLogger('crawler').exception('Unhandled scraping error: %s', req.download_params())
 
             if self._on_complete is not None:
                 self._on_complete(spider)

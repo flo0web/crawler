@@ -6,6 +6,16 @@ DEFAULT_HEADERS = {
 }
 
 
+class ScraperError(Exception):
+    pass
+
+
+class WrongPage(ScraperError):
+    """Raises when the scraper determines that the source code of the page does not match the required one.
+    A common case when using shared proxies."""
+    pass
+
+
 class Scraper:
     name = None
 
